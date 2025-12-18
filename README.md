@@ -24,7 +24,7 @@ The system is intentionally **medium-sized** — not a toy project, not an enter
 ✔ Retry mechanism with Dead Letter Queues (DLQ)  
 ✔ Message acknowledgment & failure handling  
 ✔ Email templating with Handlebars  
-✔ Persistent notification logs using PostgreSQL + Prisma  
+🚧 Persistent notification logs using PostgreSQL + Prisma  
 ✔ Dockerized local development environment  
 ✔ Clean, extensible backend architecture  
 
@@ -36,7 +36,7 @@ The system is intentionally **medium-sized** — not a toy project, not an enter
 - **NestJS / Node.js**
 - **RabbitMQ (AMQP)**
 - **PostgreSQL**
-- **Prisma ORM**
+- *Prisma ORM*
 - **Nodemailer** (Email)
 - **Handlebars** (Email templates)
 
@@ -203,5 +203,3 @@ bash curl_examples.sh
 
 ## 👨‍💻 Author
 Built as a backend-focused project to demonstrate **event-driven systems, messaging reliability, and scalable notification architecture**.
-
----
