@@ -2,17 +2,21 @@ import nodemailer from 'nodemailer';
 import Handlebars from 'handlebars';
 import fs from 'fs';
 import path from 'path';
+import { ConfigService } from '@nestjs/config';
+import { Injectable } from '@nestjs/common';
 
+@Injectable()
 export class EmailService {
-  transporter: nodemailer.Transporter;
+  private transporter: nodemailer.Transporter;
 
-  constructor() {
+  constructor(private readonly configService: ConfigService) {
     this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.ethereal.email',
-      port: Number(process.env.SMTP_PORT || 587),
+      // host: process.env.SMTP_HOST || 'smtp.ethereal.email',
+      // port: Number(process.env.SMTP_PORT || 587),
+      service: 'gmail',
       auth: {
-        user: process.env.SMTP_USER || '',
-        pass: process.env.SMTP_PASS || '',
+        user: this.configService.get<string>('SMTP_USER') || '',
+        pass: this.configService.get<string>('SMTP_PASS') || '',
       },
     });
   }
@@ -41,7 +45,7 @@ export class EmailService {
         : `<pre>${JSON.stringify(opts.data ?? {})}</pre>`;
 
       const info = await this.transporter.sendMail({
-        from: process.env.EMAIL_FROM || 'no-reply@example.com',
+        from: this.configService.get<string>('EMAIL_FROM') as string,
         to,
         subject,
         html,
