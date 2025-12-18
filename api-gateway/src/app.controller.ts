@@ -1,7 +1,7 @@
 import { appService } from './app.service';
-import { Controller, Post, Get, Body } from '@nestjs/common';
+import { Controller, Post, Get, Body, Res } from '@nestjs/common';
 import type { Response } from 'express';
-import { NotifyDto, OrderDto } from './Dto/dto';
+import { NotifyDto, OrderDto, UserDto } from './Dto/dto';
 
 @Controller('api-service')
 export class AppController {
@@ -12,6 +12,10 @@ export class AppController {
     return 'Hello World!';
   }
 
+  @Post('/api/v1/signup')
+  async userSignup(@Body() body: UserDto) {
+    return this.appService.userSignup(body);
+  }
   @Post('/api/v1/order')
   async orderCreation(@Body() body: OrderDto) {
     return this.appService.order(body);
@@ -22,12 +26,12 @@ export class AppController {
   }
 
   @Get('/api/v1/health')
-  getHealth(res: Response) {
+  getHealth(@Res() res: Response) {
     return res.status(200).send('OK');
   }
 
   @Get('/api/v1/metrics')
-  getMetrics(res: Response) {
+  getMetrics(@Res() res: Response) {
     return res.json({ published: 0, delivered: 0, failed: 0 });
   }
 }
