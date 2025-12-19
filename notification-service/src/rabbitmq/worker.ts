@@ -16,12 +16,42 @@ export class Worker implements OnModuleDestroy {
     this.ch.close();
     throw new Error('Method not implemented.');
   }
-  async init() {
-    this.conn = await amqp.connect(this.url);
-    this.ch = await this.conn.createChannel();
-    await this.ch.assertExchange(this.exchange, 'topic', { durable: true });
-    console.log('Worker connected');
+  // async init() {
+  //   this.conn = await amqp.connect(this.url);
+  //   this.ch = await this.conn.createChannel();
+  //   await this.ch.assertExchange(this.exchange, 'topic', { durable: true });
+  //   console.log('Worker connected');
+  // }
+
+  async init(retries = 5) {
+    while (retries > 0) {
+      try {
+        this.conn = await amqp.connect(this.url);
+
+        this.conn.on('close', () => {
+          console.error('❌ RabbitMQ connection closed. Reconnecting...');
+          this.ch = undefined as any;
+          this.init();
+        });
+
+        this.conn.on('error', (err) => {
+          console.error('❌ RabbitMQ connection error', err);
+        });
+
+        this.ch = await this.conn.createChannel();
+        await this.ch.assertExchange(this.exchange, 'topic', { durable: true });
+        console.log('Worker connected');
+        return;
+      } catch (err) {
+        retries--;
+        console.error('❌ RabbitMQ not ready, retrying...', err.message);
+        await new Promise((r) => setTimeout(r, 3000));
+      }
+    }
+
+    console.error('❌ RabbitMQ connection failed after retries');
   }
+
   async assertQueue(
     name: string,
     opts: any,

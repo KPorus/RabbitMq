@@ -6,7 +6,7 @@ import { Publisher } from './publisher/publisher';
 export class appService {
   constructor(private readonly publisher: Publisher) {}
 
-  async userSignup(data: UserDto) {
+  userSignup(data: UserDto) {
     const { userId, email, name, pass } = data;
     if (!userId || !email || !name || !pass)
       return { error: 'userId, email, name and pass required' };
@@ -19,10 +19,10 @@ export class appService {
       meta: {},
     };
     console.log(message);
-    await this.publisher.publish(`${routing}.email`, message);
+    this.publisher.publish(`${routing}.email`, message);
     return 'User signup published';
   }
-  async notify(data: NotifyDto) {
+  notify(data: NotifyDto) {
     const { type, template, to, payload, meta } = data;
     if (!type || !to) return { error: 'type and to required' };
     const routing = `notify.${type}`;
@@ -34,11 +34,11 @@ export class appService {
       meta: meta || {},
     };
     console.log(message);
-    await this.publisher.publish(routing, message);
+    this.publisher.publish(routing, message);
     return { status: 'published', routingKey: routing };
   }
 
-  async order(data: OrderDto) {
+  order(data: OrderDto) {
     const { orderId, userId, email, amount, items } = data;
     if (!orderId || !userId || !email)
       return { error: 'orderId, userId and email required' };
@@ -50,7 +50,7 @@ export class appService {
       payload: { orderId, userId, email, amount, items },
     };
     console.log(message);
-    await this.publisher.publish(`${routing}.email`, message);
+    this.publisher.publish(`${routing}.email`, message);
     return { status: 'published', routingKey: routing };
   }
 }

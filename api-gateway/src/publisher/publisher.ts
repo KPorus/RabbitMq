@@ -33,53 +33,90 @@ export class Publisher {
     });
   }
 
-  async init() {
-    try {
-      this.conn = await amqp.connect(this.url);
-      this.ch = await this.conn.createChannel();
-      await this.ch.assertExchange(this.exchange, 'topic', { durable: true });
+  private buffer: Array<{ key: string; msg: any }> = [];
+  private MAX_BUFFER = 1000;
+  private async flushBuffer() {
+    if (!this.ch) return;
 
-      // init succeeded
-      this.confirmsEnabled = true;
-      console.log('Publisher connected to', this.url);
-    } catch (error) {
-      // init failed
-      this.confirmsEnabled = false;
-      this.ch = undefined as any;
-      this.conn = undefined as any;
+    console.log(`🔁 Flushing ${this.buffer.length} buffered events`);
 
-      console.error('Failed to initialize publisher', {
-        url: this.url,
-        error,
-      });
+    const items = [...this.buffer];
+    this.buffer = [];
+
+    for (const e of items) {
+      try {
+        await this.publishDirect(e.key, e.msg);
+      } catch {
+        this.buffer.push(e);
+        break;
+      }
     }
   }
 
-  // async init() {
-  //   this.conn = await amqp.connect(this.url);
-  //   this.ch = await this.conn.createChannel();
-  //   await this.ch.assertExchange(this.exchange, 'topic', { durable: true });
-  //   // this.confirmsEnabled = this.ch instanceof amqp.ConfirmChannel;
-  //   this.confirmsEnabled = true;
-  //   console.log(this.confirmsEnabled);
-  //   console.log('Publisher connected to', this.url);
-  // }
-  async publish(routingKey: string, message: any) {
-    if (!this.ch) throw new Error('channel not ready');
+  async init(retries = 5) {
+    while (retries > 0) {
+      try {
+        this.conn = await amqp.connect(this.url);
+
+        this.conn.on('close', () => {
+          console.error('❌ RabbitMQ connection closed. Reconnecting...');
+          this.ch = undefined as any;
+          this.init();
+        });
+
+        this.conn.on('error', (err) => {
+          console.error('❌ RabbitMQ connection error', err);
+        });
+
+        this.ch = await this.conn.createConfirmChannel();
+        await this.ch.assertExchange(this.exchange, 'topic', { durable: true });
+        await this.flushBuffer();
+
+        this.confirmsEnabled = true;
+        console.log('✅ Publisher connected to', this.url);
+        return;
+      } catch (err) {
+        retries--;
+        console.error('❌ RabbitMQ not ready, retrying...', err.message);
+        await new Promise((r) => setTimeout(r, 3000));
+      }
+    }
+
+    console.error('❌ RabbitMQ connection failed after retries');
+  }
+
+  private async publishDirect(routingKey: string, message: any) {
     const payload = Buffer.from(JSON.stringify(message));
-    const success = await this.ch.publish(this.exchange, routingKey, payload, {
-      persistent: true,
-      headers: { attempts: 0 },
+
+    await new Promise<void>((resolve, reject) => {
+      this.ch.publish(
+        this.exchange,
+        routingKey,
+        payload,
+        { persistent: true },
+        (err) => (err ? reject(new Error(err.message)) : resolve()),
+      );
     });
-    if (success && this.confirmsEnabled) {
-      await new Promise((resolve, reject) => {
-        this.ch.once('ack', resolve);
-        this.ch.once('nack', reject);
-      });
-    } else if (!success) {
-      throw new Error('Publish failed - queue full');
+  }
+
+  async publish(routingKey: string, message: any) {
+    if (!this.ch) {
+      if (this.buffer.length >= this.MAX_BUFFER) {
+        console.error('❌ Event buffer overflow. Dropping event.', routingKey);
+        return;
+      }
+      this.buffer.push({ key: routingKey, msg: message });
+      return;
+    }
+
+    try {
+      await this.publishDirect(routingKey, message);
+    } catch (err) {
+      console.error('❌ Publish failed, re-buffering', err);
+      this.buffer.push({ key: routingKey, msg: message });
     }
   }
+
   async close() {
     await this.ch?.close();
     await this.conn?.close();
