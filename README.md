@@ -50,24 +50,53 @@ The system is intentionally **medium-sized** — not a toy project, not an enter
 ## 🏗️ High-Level Architecture
 
 ```mermaid
-flowchart LR
-  A[API Gateway<br/>NestJS] -->|Publish Events| B((RabbitMQ<br/>Topic Exchange))
+flowchart TB
+    %% Clients
+    C[Client / Frontend / External Service]
 
-  B --> Q1[Email Queue]
-  B --> Q2[SMS Queue]
-  B --> Q3[Push Queue]
+    %% API Gateway
+    C -->|HTTP REST| API[API Gateway<br/>NestJS]
 
-  Q1 --> E[Email Consumer]
-  Q2 --> S[SMS Consumer]
-  Q3 --> P[Push Consumer]
+    %% Exchange
+    API -->|Publish Event<br/>routingKey| EX((RabbitMQ<br/>Topic Exchange<br/>notifications.topic))
 
-  E --> DB[(PostgreSQL)]
-  S --> DB
-  P --> DB
+    %% Routing
+    EX -->|user.signup.email<br/>order.completed.email| QEMAIL[Queue: queue.email]
+    EX -->|notify.sms| QSMS[Queue: queue.sms]
+    EX -->|notify.push| QPUSH[Queue: queue.push]
 
-  E --> DLQ1[Email DLQ]
-  S --> DLQ2[SMS DLQ]
-  P --> DLQ3[Push DLQ]
+    %% Consumers
+    QEMAIL --> EMAIL[Email Consumer<br/>Notification Service]
+    QSMS --> SMS[SMS Consumer<br/>Notification Service]
+    QPUSH --> PUSH[Push Consumer<br/>Notification Service]
+
+    %% Retry Logic
+    EMAIL -->|ACK success| ACK1[(Ack)]
+    EMAIL -->|Fail + Retry <= 3| RETRY1[Requeue with attempt++]
+    EMAIL -->|Fail after max retries| DLQEMAIL[Email DLQ]
+
+    SMS -->|Fail| DLQSMS[SMS DLQ]
+    PUSH -->|Fail| DLQPUSH[Push DLQ]
+
+    %% External Providers
+    EMAIL --> SMTP[SMTP / SendGrid]
+    SMS --> TWILIO[Twilio / Mock SMS]
+    PUSH --> FCM[Firebase FCM]
+
+    %% Database
+    EMAIL --> DB[(PostgreSQL<br/>Notification Logs)]
+    SMS --> DB
+    PUSH --> DB
+
+    %% Monitoring
+    API --> METRICS[/Metrics Endpoint/]
+    EMAIL --> METRICS
+
+    %% Styling
+    style EX fill:#f6c,stroke:#333,stroke-width:2px
+    style DLQEMAIL fill:#ffcccc
+    style DLQSMS fill:#ffcccc
+    style DLQPUSH fill:#ffcccc
 ```
 
 ---
