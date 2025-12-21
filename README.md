@@ -91,12 +91,6 @@ flowchart TB
     %% Monitoring
     API --> METRICS[/Metrics Endpoint/]
     EMAIL --> METRICS
-
-    %% Styling
-    style EX fill:#f6c,stroke:#333,stroke-width:2px
-    style DLQEMAIL fill:#ffcccc
-    style DLQSMS fill:#ffcccc
-    style DLQPUSH fill:#ffcccc
 ```
 
 ---
